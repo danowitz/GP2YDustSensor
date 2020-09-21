@@ -155,14 +155,30 @@ uint16_t GP2YDustSensor::readDustRawOnce()
  */
 uint16_t GP2YDustSensor::getDustDensity(uint16_t numSamples)
 {
+    uint32_t sample = 0;
     uint32_t total = 0;
     uint16_t avgRaw;
-  
+    uint32_t minValue = 1024;
+    uint32_t maxValue = 0;
+    
+
+    system_soft_wdt_stop();
+    ets_intr_lock( ); 
+    noInterrupts();
+
     for (uint8_t i = 0; i < numSamples; i++) {
-        total += this->readDustRawOnce();
+        sample = this->readDustRawOnce();
+        total += sample;
+        if(sample > maxValue) maxValue = sample;
+        if(sample < minValue) minValue = sample;
+        
         // Wait for remainder of the 10ms cycle = 10000 - 280 - 100 microseconds.
         delayMicroseconds(9620);
     }
+
+    interrupts();
+    ets_intr_unlock(); 
+    system_soft_wdt_restart();
 
     avgRaw = total / numSamples;
 
@@ -177,9 +193,12 @@ uint16_t GP2YDustSensor::getDustDensity(uint16_t numSamples)
     }
 
     uint16_t dustDensity;
-
+    uint16_t diff = abs(abs(avgRaw - maxValue) - abs(avgRaw - minValue));
+    
     if (scaledVoltage < zeroDustVoltage) {
         dustDensity = 0;
+    } else if(diff > 10 && previousDustDensity > 0) {
+        dustDensity = previousDustDensity;
     } else {
         // taken from the graph, at 0.4mg dust density we should have 3.05 volts
         // 3.05v ................ 0.4
@@ -193,6 +212,13 @@ uint16_t GP2YDustSensor::getDustDensity(uint16_t numSamples)
         dustDensity = (scaledVoltage - zeroDustVoltage) / this->sensitivity * 100;
     }
 
+    if(dustDensity == 0 && previousDustDensity > 0) {
+        dustDensity = previousDustDensity;
+        previousDustDensity = 0;
+    } else {
+        previousDustDensity = dustDensity;
+    }
+
     if (this->runningAverageCount) {
         this->updateRunningAverage(dustDensity);
     }
@@ -204,6 +230,18 @@ uint16_t GP2YDustSensor::getDustDensity(uint16_t numSamples)
         }
     }
 
+    /*
+    Serial.print(diff);
+    Serial.print(" ");
+    Serial.print(avgRaw);
+    Serial.print(" ");
+    Serial.print(dustDensity);
+    Serial.print(" ");
+    Serial.print(minValue);
+    Serial.print(" ");
+    Serial.println(maxValue);
+    */
+    
     return dustDensity;
 }
 
