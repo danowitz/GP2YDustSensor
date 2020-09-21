@@ -1,4 +1,7 @@
 #include <stdint.h>
+extern "C" {
+    #include "user_interface.h"
+}
 
 enum GP2YDustSensorType
 {
@@ -11,6 +14,7 @@ class GP2YDustSensor
     private:
         GP2YDustSensorType type;
         uint32_t maxAdc;
+        uint16_t previousDustDensity;
         uint8_t ledOutputPin;
         uint8_t analogReadPin;
         float zeroDustVoltage;
@@ -37,7 +41,7 @@ class GP2YDustSensor
         GP2YDustSensor(GP2YDustSensorType type, uint8_t ledOutputPin, uint8_t analogReadPin, uint16_t runningAverageCount = 60);
         ~GP2YDustSensor();
         void begin();
-        uint16_t getDustDensity(uint16_t numSamples = 20);
+        uint16_t getDustDensity(uint16_t numSamples = 30);
         uint16_t getRunningAverage();
         float getBaseline();
         void setBaseline(float zeroDustVoltage);
